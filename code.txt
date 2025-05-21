@@ -1,0 +1,427 @@
+Check everything and point me potential errors or if i left out something or some file pathing issues
+server.js
+const express = require("express");
+const connectDb = require("./config/dbConnection");
+const errorHandler = require("./middleware/errorHandler");
+const dotenv = require("dotenv").config();
+
+connectDb();
+const app = express();
+
+const port = process.env.PORT || 5000;
+
+app.use(express.json());
+app.use("/api/contacts", require("./Routes/contactRoutes"));
+app.use("/api/users", require("./Routes/userRoutes"));
+app.use(errorHandler);
+
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
+
+constants.js
+const express = require("express");
+const connectDb = require("./config/dbConnection");
+const errorHandler = require("./middleware/errorHandler");
+const dotenv = require("dotenv").config();
+
+connectDb();
+const app = express();
+
+const port = process.env.PORT || 5000;
+
+app.use(express.json());
+app.use("/api/contacts", require("./Routes/contactRoutes"));
+app.use("/api/users", require("./Routes/userRoutes"));
+app.use(errorHandler);
+
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
+
+.env
+PORT = 5001
+
+CONNECTION_STRING = mongodb+srv://admin:admin@amitcluster.6ynf701.mongodb.net/mycontacts-backend?retryWrites=true&w=majority&appName=AmitCluster
+
+ACCESS_TOKEN_SECRET = amit123
+
+Routes/contactRoutes.js
+const express = require("express");
+const router = express.Router();
+const {
+  getContacts,
+  createContact,
+  getContact,
+  updateContact,
+  deleteContact,
+} = require("../Controllers/contactController");
+const validateToken = require("../middleware/validateTokenHandler");
+
+router.use(validateToken);
+router.route("/").get(getContacts).post(createContact);
+router.route("/:id").get(getContact).put(updateContact).delete(deleteContact);
+
+module.exports = router;
+// router.route('/').get(getContacts);
+
+// router.route('/').post(createContact);
+
+// router.route('/:id').get(getContact);
+
+// router.route('/:id').put(updateContact);
+ 
+// router.route('/:id').delete(deleteContact);
+
+Routes/userRoutes.js
+const express = require("express");
+const {
+  registerUser,
+  currentUser,
+  loginUser,
+} = require("../Controllers/userController");
+const validateToken = require("../middleware/validateTokenHandler");
+
+const router = express.Router();
+
+router.post("/register", registerUser);
+ 
+router.post("/login", loginUser);
+
+router.get("/current", validateToken, currentUser);
+
+module.exports = router;
+
+/models/contactModel.js
+const mongoose = require("mongoose");
+
+const contactSchema = mongoose.Schema(
+  {
+    user_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      ref: "User",
+    },
+    name: {
+      type: String,
+      required: [true, "Please add the contact name"],
+    },
+    email: {
+      type: String,
+      required: [true, "Please add the contact email address"],
+    },
+    phone: {
+      type: String,
+      required: [true, "Please add the contact phone number"],
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+module.exports = mongoose.model("Contact", contactSchema);
+
+models/userModel.js
+const mongoose = require("mongoose");
+
+const userSchema = mongoose.Schema(
+  {
+    username: {
+      type: String,
+      required: [true, "Please add the user name"],
+    },
+    email: {
+      type: String,
+      required: [true, "Please add the user email address"],
+      unique: [true, "Email address already taken"],
+    },
+    password: {
+      type: String,
+      required: [true, "Please add the user password"],
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+module.exports = mongoose.model("User", userSchema);
+
+middleware/errorHandler.js
+const { constants } = require("../constants");
+const errorHandler = (err, req, res, next) => {
+  const statusCode = res.statusCode ? res.statusCode : 500;
+  switch (statusCode) {
+    case constants.VALIDATION_ERROR:
+      res.json({
+        title: "Validation Failed",
+        message: err.message,
+        stackTrace: err.stack,
+      });
+      break;
+    case constants.NOT_FOUND:
+      res.json({
+        title: "Not Found",
+        message: err.message,
+        stackTrace: err.stack,
+      });
+    case constants.UNAUTHORIZED:
+      res.json({
+        title: "Unauthorized",
+        message: err.message,
+        stackTrace: err.stack,
+      });
+    case constants.FORBIDDEN:
+      res.json({
+        title: "Forbidden",
+        message: err.message,
+        stackTrace: err.stack,
+      });
+    case constants.SERVER_ERROR:
+      res.json({
+        title: "Server Error",
+        message: err.message,
+        stackTrace: err.stack,
+      });
+    default:
+      console.log("No Error, All good !");
+      break;
+  }
+};
+
+module.exports = errorHandler;
+
+middleware/validateTokenHandler.js
+const { constants } = require("../constants");
+const errorHandler = (err, req, res, next) => {
+  const statusCode = res.statusCode ? res.statusCode : 500;
+  switch (statusCode) {
+    case constants.VALIDATION_ERROR:
+      res.json({
+        title: "Validation Failed",
+        message: err.message,
+        stackTrace: err.stack,
+      });
+      break;
+    case constants.NOT_FOUND:
+      res.json({
+        title: "Not Found",
+        message: err.message,
+        stackTrace: err.stack,
+      });
+    case constants.UNAUTHORIZED:
+      res.json({
+        title: "Unauthorized",
+        message: err.message,
+        stackTrace: err.stack,
+      });
+    case constants.FORBIDDEN:
+      res.json({
+        title: "Forbidden",
+        message: err.message,
+        stackTrace: err.stack,
+      });
+    case constants.SERVER_ERROR:
+      res.json({
+        title: "Server Error",
+        message: err.message,
+        stackTrace: err.stack,
+      });
+    default:
+      console.log("No Error, All good !");
+      break;
+  }
+};
+
+module.exports = errorHandler;
+
+Controllers/userController.js
+const asyncHandler = require("express-async-handler");
+const bcrypt = require('bcrypt');
+const User = require('../models/userModel');
+const jwt = require('jsonwebtoken')
+
+// @desc Register a user
+// @route POST /api/users/register/
+// @access public
+const registerUser = asyncHandler(async(req, res)=>{
+    const { username, email, password } = req.body;
+    if(!username || !email || !password)
+    {
+        res.status(400);
+        throw new Error("All fields are mandatory")
+    }
+    const userAvailable = await User.findOne({email});
+    if(userAvailable){
+        throw new Error("User is already registered");
+    }
+    // Hash Password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("Hashed Password",hashedPassword);
+    const user = await User.create({
+        username,
+        email,
+        password: hashedPassword
+    });
+    console.log(`User created ${user}`);
+    if(user)
+    {
+        res.status(201).json({
+            _id: user.id,
+            email:user.email
+        })
+    }
+    else
+    {
+        res.status(400);
+        throw new Error("User data is not valid");
+    }
+    res.json({message: "Register the user"})
+})
+
+// @desc Login a user
+// @route POST /api/users/login/
+// @access public
+const loginUser = asyncHandler(async(req, res)=>{
+    const { email, password } = req.body;
+    if(!email || !password)
+    {
+        res.status(400);
+        throw new Error("All fields are madatory");
+    }
+    const user = await User.findOne({ email });
+    // Compare password with hasedPassword
+    if(user && (await bcrypt.compare(password, user.password)))
+    {
+        const accessToken = jwt.sign({
+            user: {
+                username: user.username,
+                email: user.email,
+                id: user.id
+            }
+        },
+        process.env.ACCESS_TOKEN_SECRET,
+        {expireIn: "1m"}
+    );
+        res.status(200).json({
+            accessToken
+        })
+    }
+    else
+    {
+        res.status(401);
+        throw new Error("Email or password is not valid")
+    }
+})
+
+// @desc Current user info
+// @route POST /api/users/current/
+// @access public
+const currentUser = asyncHandler(async(req, res)=>{
+    res.json({message: "Current user information"})
+})
+
+module.exports = {
+    registerUser, 
+    loginUser,
+    currentUser
+}
+
+Controllers/contactController.js
+const asyncHandler = require("express-async-handler");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const User = require("../models/userModel");
+
+//@desc Register a user
+//@route POST /api/users/register
+//@access public
+const registerUser = asyncHandler(async (req, res) => {
+  const { username, email, password } = req.body;
+  if (!username || !email || !password) {
+    res.status(400);
+    throw new Error("All fields are mandatory!");
+  }
+  const userAvailable = await User.findOne({ email });
+  if (userAvailable) {
+    res.status(400);
+    throw new Error("User already registered!");
+  }
+
+  //Hash password
+  const hashedPassword = await bcrypt.hash(password, 10);
+  console.log("Hashed Password: ", hashedPassword);
+  const user = await User.create({
+    username,
+    email,
+    password: hashedPassword,
+  });
+
+  console.log(`User created ${user}`);
+  if (user) {
+    res.status(201).json({ _id: user.id, email: user.email });
+  } else {
+    res.status(400);
+    throw new Error("User data is not valid");
+  }
+  res.json({ message: "Register the user" });
+});
+
+//@desc Login user
+//@route POST /api/users/login
+//@access public
+const loginUser = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    res.status(400);
+    throw new Error("All fields are mandatory!");
+  }
+  const user = await User.findOne({ email });
+  //compare password with hashedpassword
+  if (user && (await bcrypt.compare(password, user.password))) {
+    const accessToken = jwt.sign(
+      {
+        user: {
+          username: user.username,
+          email: user.email,
+          id: user.id,
+        },
+      },
+      process.env.ACCESS_TOKEN_SECERT,
+      { expiresIn: "15m" }
+    );
+    res.status(200).json({ accessToken });
+  } else {
+    res.status(401);
+    throw new Error("email or password is not valid");
+  }
+});
+
+//@desc Current user info
+//@route POST /api/users/current
+//@access private
+const currentUser = asyncHandler(async (req, res) => {
+  res.json(req.user);
+});
+
+module.exports = { registerUser, loginUser, currentUser };
+
+config/dbConnection.js
+const mongoose = require("mongoose");
+
+const connectDb = async () => {
+  try {
+    const connect = await mongoose.connect(process.env.CONNECTION_STRING);
+    console.log(
+      "Database connected: ",
+      connect.connection.host,
+      connect.connection.name
+    );
+  } catch (err) {
+    console.log(err);
+    process.exit(1);
+  }
+};
+
+module.exports = connectDb;
